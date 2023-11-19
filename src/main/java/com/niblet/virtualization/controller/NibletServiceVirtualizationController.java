@@ -32,6 +32,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.niblet.virtualization.jpa.entity.MockApiRequestResponseEntity;
 import com.niblet.virtualization.jpa.repository.MockApiRequestResponseManagedRepository;
+import com.niblet.virtualization.util.NibletServiceVirtualizationUtils;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -48,12 +49,6 @@ public class NibletServiceVirtualizationController {
 	@GetMapping(value = { "/**" })
 	public ResponseEntity<String> getMockRequest(HttpServletRequest httpServletRequest,
 			@RequestHeader Map<String, String> headers, @RequestParam Map<String, String> queryParameters) {
-
-		// accept request
-		// match URL to db to get data
-		// match by values in request
-		// run response payload through generatedValues update
-		// send request
 
 		return processAnyMockRequest(HttpMethod.GET.name(), httpServletRequest.getRequestURI(), null, headers,
 				queryParameters);
@@ -131,7 +126,7 @@ public class NibletServiceVirtualizationController {
 		// prioritize exact match over regex
 		// prioritize regex over wildcard (only has ".*")
 		// within a regex, priority in order:
-		// digits ("[0-9]+")
+		// digits ("\\d+")
 		// alpha ("[a-zA-Z]+")
 		// alphanumeric ("\\w+") or ("[a-zA-Z9-0_]+")
 		// date formats???, perhaps any other regex that isn't matching anything
@@ -141,14 +136,6 @@ public class NibletServiceVirtualizationController {
 		// if still has more than one match what do we do? return special error with
 		// message?
 
-		// create new entity
-		// includes mockApi entity
-		// num(Path|Header|Query)ExactMatches
-		// num(Path|Header|Query)CustomMatches
-		// num(Path|Header|Query)AlphaOrDigitMatches
-		// num(Path|Header|Query)AlphaNumericMatches
-		// num(Path|Header|Query)WildCardMatches
-
 		// 0) power exercise
 		// 1) start noodles
 		// 2) shower
@@ -156,8 +143,154 @@ public class NibletServiceVirtualizationController {
 		// 4) floss & brush teeth
 		// 5) create new empty spring boot project with H2 DB
 
-		List<MockApiRequestResponseEntity> matchingRegexList = new ArrayList<>();
-		List<MockApiRequestResponseEntity> matchingExactlyPathList = new ArrayList<>();
+		List<MockApiFilterData> pathFilteredList = getPathFilteredList(mockApiRequestResponseEntityList, requestURI);
+		updateQueryCounts(pathFilteredList, queryParameters);
+		updateHeaderCounts(pathFilteredList, headers);
+
+		Collections.sort(pathFilteredList, NibletServiceVirtualizationUtils.MOCK_API_FILTER_DATA_COMPARITOR);
+
+		MockApiRequestResponseEntity entity = pathFilteredList.get(0).getMockApiRequestResponseEntity();
+		String responseBody = entity.getResponseBody();
+		HttpStatus responseStatus = HttpStatus.valueOf(Integer.valueOf(entity.getResponseStatus()));
+
+		if (StringUtils.isNotBlank(responseBody)) {
+
+			return new ResponseEntity<>(responseBody, responseStatus);
+		}
+
+		return new ResponseEntity<>(responseStatus);
+	}
+
+	private void updateHeaderCounts(List<MockApiFilterData> pathFilteredList, Map<String, String> headers) {
+
+		for (MockApiFilterData mockApiFilterData : pathFilteredList) {
+
+			String entityHeadersString = mockApiFilterData.getMockApiRequestResponseEntity().getRequestHeaders();
+
+			if (".*".equals(entityHeadersString))
+				continue;
+
+			// remove '.*' from start and end
+			entityHeadersString = entityHeadersString.substring(2);
+			entityHeadersString = entityHeadersString.substring(0, entityHeadersString.length() - 2);
+
+			String[] entityHeadersSplit = entityHeadersString.split("\\.\\*");
+
+			for (String keyValueStr : entityHeadersSplit) {
+
+				// remove "\<" from start and "\>" from end
+				keyValueStr = keyValueStr.substring(2);
+				keyValueStr = keyValueStr.substring(0, keyValueStr.length() - 2);
+				
+				String[] keyValue = keyValueStr.split("=");
+				String key = keyValue[0];
+				String value = keyValue[1];
+
+				if (headers.containsKey(key)) {
+
+					String requestValue = headers.get(key);
+
+					if (requestValue.equals(value)) {
+
+						mockApiFilterData.setNumHeaderExactMatches(mockApiFilterData.getNumHeaderExactMatches() + 1);
+
+					} else { // check regex type
+
+						if (".+".equals(value)) {
+
+							mockApiFilterData
+									.setNumHeaderWildCardMatches(mockApiFilterData.getNumHeaderWildCardMatches() + 1);
+
+						} else if ("\\d+".equals(value)) {
+
+							mockApiFilterData
+									.setNumHeaderDigitMatches(mockApiFilterData.getNumHeaderDigitMatches() + 1);
+
+						} else if ("[a-zA-Z0-9_]+".equals(value)) {
+
+							mockApiFilterData.setNumHeaderAlphaNumericMatches(
+									mockApiFilterData.getNumHeaderAlphaNumericMatches() + 1);
+
+						} else {
+
+							mockApiFilterData
+									.setNumHeaderCustomMatches(mockApiFilterData.getNumHeaderCustomMatches() + 1);
+						}
+					}
+				}
+			}
+		}
+	}
+
+	private void updateQueryCounts(List<MockApiFilterData> pathFilteredList, Map<String, String> queryParameters) {
+
+		for (MockApiFilterData mockApiFilterData : pathFilteredList) {
+
+			String entityQueryParameterString = mockApiFilterData.getMockApiRequestResponseEntity()
+					.getRequestQueryParameters();
+			if (".*".equals(entityQueryParameterString)) {
+				// actual sent headers -> Project-Name=BLCRM;Zeno=Bob
+				// in db -> .*project-name=(?<project-name>.+).*zeno=Bob.*
+				// use .+ inside innerRegex to avoid clash with .* between headers
+				continue;
+			}
+
+			// remove '.*' from start and end
+			entityQueryParameterString = entityQueryParameterString.substring(2);
+			entityQueryParameterString = entityQueryParameterString.substring(0,
+					entityQueryParameterString.length() - 2);
+
+			String[] entityQueryParameterSplit = entityQueryParameterString.split(".*");
+
+			for (String keyValueStr : entityQueryParameterSplit) {
+
+				// remove "\<" from start and "\>" from end
+				keyValueStr = keyValueStr.substring(2);
+				keyValueStr = keyValueStr.substring(0, keyValueStr.length() - 2);
+
+				String[] keyValue = keyValueStr.split("=");
+				String key = keyValue[0];
+				String value = keyValue[1];
+
+				if (queryParameters.containsKey(key)) {
+
+					String requestValue = queryParameters.get(key);
+
+					if (requestValue.equals(value)) {
+
+						mockApiFilterData.setNumQueryExactMatches(mockApiFilterData.getNumQueryExactMatches() + 1);
+
+					} else { // check regex type
+
+						if (".+".equals(value)) {
+
+							mockApiFilterData
+									.setNumQueryWildCardMatches(mockApiFilterData.getNumQueryWildCardMatches() + 1);
+
+						} else if ("\\d+".equals(value)) {
+
+							mockApiFilterData.setNumQueryDigitMatches(mockApiFilterData.getNumQueryDigitMatches() + 1);
+
+						} else if ("[a-zA-Z0-9_]+".equals(value)) {
+
+							mockApiFilterData.setNumQueryAlphaNumericMatches(
+									mockApiFilterData.getNumQueryAlphaNumericMatches() + 1);
+
+						} else {
+
+							mockApiFilterData
+									.setNumQueryCustomMatches(mockApiFilterData.getNumQueryCustomMatches() + 1);
+						}
+					}
+				}
+			}
+		}
+	}
+
+	private List<MockApiFilterData> getPathFilteredList(
+			List<MockApiRequestResponseEntity> mockApiRequestResponseEntityList, String requestURI) {
+
+		List<MockApiFilterData> pathFilteredList = new ArrayList<>();
 
 		// remove '/' from string start
 		requestURI = requestURI.substring(1);
@@ -167,6 +300,8 @@ public class NibletServiceVirtualizationController {
 
 		for (MockApiRequestResponseEntity mockApiEntity : mockApiRequestResponseEntityList) {
 
+			MockApiFilterData possibleMockApiFilterData = new MockApiFilterData();
+			possibleMockApiFilterData.setMockApiRequestResponseEntity(mockApiEntity);
 			String mockApiPath = mockApiEntity.getApiPath();
 			// remove '/' from string start
 			mockApiPath = mockApiPath.substring(1);
@@ -174,15 +309,16 @@ public class NibletServiceVirtualizationController {
 			if (mockApiPath.charAt(mockApiPath.length() - 1) == '/')
 				mockApiPath = mockApiPath.substring(0, mockApiPath.length() - 1);
 
+			boolean requestPathHasRegex = mockApiPath.contains("(?<");
+			String[] entityPathSections = mockApiPath.split("/");
+			String[] requestURIPathSections = requestURI.split("/");
+
 			if (StringUtils.equals(mockApiPath, requestURI)) {
 
-				matchingExactlyPathList.add(mockApiEntity);
+				possibleMockApiFilterData.setNumPathExactMatches(entityPathSections.length);
+				pathFilteredList.add(possibleMockApiFilterData);
 
 			} else {
-
-				boolean requestPathHasRegex = mockApiPath.contains("(?<");
-				String[] entityPathSections = mockApiPath.split("/");
-				String[] requestURIPathSections = requestURI.split("/");
 
 				// If the number of sections doesn't match,
 				// then the path itself could never match.
@@ -204,6 +340,8 @@ public class NibletServiceVirtualizationController {
 
 					if (entityPathSection.equals(requestURIPathSection)) {
 
+						possibleMockApiFilterData
+								.setNumPathExactMatches(possibleMockApiFilterData.getNumPathExactMatches() + 1);
 						continue;
 					}
 
@@ -224,27 +362,41 @@ public class NibletServiceVirtualizationController {
 						if (!requestURIPathSection.matches(internalRegex)) {
 
 							allSectionsMatch = false;
+
+						} else { // check regex type
+
+							if (".+".equals(internalRegex)) {
+
+								possibleMockApiFilterData.setNumPathWildCardMatches(
+										possibleMockApiFilterData.getNumPathWildCardMatches() + 1);
+
+							} else if ("\\d+".equals(internalRegex)) {
+
+								possibleMockApiFilterData
+										.setNumPathDigitMatches(possibleMockApiFilterData.getNumPathDigitMatches() + 1);
+
+							} else if ("[a-zA-Z0-9_]+".equals(internalRegex)) {
+
+								possibleMockApiFilterData.setNumPathAlphaNumericMatches(
+										possibleMockApiFilterData.getNumPathAlphaNumericMatches() + 1);
+
+							} else {
+
+								possibleMockApiFilterData.setNumPathCustomMatches(
+										possibleMockApiFilterData.getNumPathCustomMatches() + 1);
+							}
 						}
 					}
 				}
 
 				if (allSectionsMatch) {
 
-					matchingRegexList.add(mockApiEntity);
+					pathFilteredList.add(possibleMockApiFilterData);
 				}
 			}
 		}
 
-		MockApiRequestResponseEntity entity = mockApiRequestResponseEntityList.get(0);
-		String responseBody = entity.getResponseBody();
-		HttpStatus responseStatus = HttpStatus.valueOf(Integer.valueOf(entity.getResponseStatus()));
-
-		if (StringUtils.isNotBlank(responseBody)) {
-
-			return new ResponseEntity<>(responseBody, responseStatus);
-		}
-
-		return new ResponseEntity<>(responseStatus);
+		return pathFilteredList;
 	}
 
 	private String alphabetizeHeaderString(Map<String, String> headers) {
@@ -253,7 +405,7 @@ public class NibletServiceVirtualizationController {
 
 		for (Entry<String, String> keyValue : headers.entrySet()) {
 
-			headersList.add(keyValue.getKey() + "=" + keyValue.getValue());
+			headersList.add("<" + keyValue.getKey() + "=" + keyValue.getValue() + ">");
 		}
 
 		Collections.sort(headersList);
@@ -267,7 +419,7 @@ public class NibletServiceVirtualizationController {
 
 		for (Entry<String, String> keyValue : queryParameters.entrySet()) {
 
-			queryParams.add(keyValue.getKey() + "=" + keyValue.getValue());
+			queryParams.add("<" + keyValue.getKey() + "=" + keyValue.getValue() + ">");
 		}
 
 		Collections.sort(queryParams);
