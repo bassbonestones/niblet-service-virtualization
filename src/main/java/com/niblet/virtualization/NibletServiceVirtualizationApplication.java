@@ -7,8 +7,8 @@ import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 
 @SpringBootApplication(exclude = { DataSourceAutoConfiguration.class })
-@EntityScan(basePackages = "com.niblet.nibletservicevirtualization.jpa.entity")
-@EnableJpaRepositories(basePackages = "com.niblet.nibletservicevirtualization.jpa.repository")
+@EntityScan(basePackages = "com.niblet.virtualization.jpa.entity")
+@EnableJpaRepositories(basePackages = "com.niblet.virtualization.jpa.repository")
 public class NibletServiceVirtualizationApplication {
 
 	public static void main(String[] args) {

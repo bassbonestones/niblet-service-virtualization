@@ -1,11 +1,11 @@
-package com.niblet.virtualization.controller;
+package com.niblet.virtualization.model;
 
 import com.niblet.virtualization.jpa.entity.MockApiRequestResponseEntity;
 
 import lombok.Data;
 
 @Data
-public class MockApiFilterData {
+public class MockApiMatchData {
 
 	private MockApiRequestResponseEntity mockApiRequestResponseEntity;
 
@@ -20,11 +20,13 @@ public class MockApiFilterData {
 	private int numHeaderDigitMatches;
 	private int numHeaderAlphaNumericMatches;
 	private int numHeaderWildCardMatches;
+	private int numHeaderExistsMatches;
 
 	private int numQueryExactMatches;
 	private int numQueryCustomMatches;
 	private int numQueryDigitMatches;
 	private int numQueryAlphaNumericMatches;
 	private int numQueryWildCardMatches;
+	private int numQueryExistsMatches;
 
 }

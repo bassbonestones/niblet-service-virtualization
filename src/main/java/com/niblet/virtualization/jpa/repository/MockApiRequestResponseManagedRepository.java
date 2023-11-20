@@ -19,7 +19,7 @@ public class MockApiRequestResponseManagedRepository {
 	EntityManager manager;
 
 	private static final String QUERY_BY_REGEX = "SELECT ID, API_PATH, REQUEST_VERB, REQUEST_HEADERS, "
-			+ "REQUEST_PATH_PARAMETERS, REQUEST_QUERY_PARAMETERS, RESPONSE_BODY, RESPONSE_STATUS "
+			+ "REQUEST_QUERY_PARAMETERS, RESPONSE_BODY, RESPONSE_STATUS "
 			+ "FROM MOCK_API_REQUEST_RESPONSE WHERE REQUEST_VERB = '{httpMethod}' AND '{apiPath}' regexp API_PATH AND "
 			+ "'{requestHeaders}' regexp REQUEST_HEADERS AND '{queryParameters}' regexp REQUEST_QUERY_PARAMETERS;";
 
@@ -55,10 +55,9 @@ public class MockApiRequestResponseManagedRepository {
 		mockApiData.setApiPath(Objects.toString(obj[1]));
 		mockApiData.setRequestVerb(Objects.toString(obj[2]));
 		mockApiData.setRequestHeaders(Objects.toString(obj[3]));
-		mockApiData.setRequestPathParameters(Objects.toString(obj[4]));
-		mockApiData.setRequestQueryParameters(Objects.toString(obj[5]));
-		mockApiData.setResponseBody(Objects.toString(obj[6]));
-		mockApiData.setResponseStatus(Objects.toString(obj[7]));
+		mockApiData.setRequestQueryParameters(Objects.toString(obj[4]));
+		mockApiData.setResponseBody(Objects.toString(obj[5]));
+		mockApiData.setResponseStatus(Objects.toString(obj[6]));
 
 		return mockApiData;
 	}

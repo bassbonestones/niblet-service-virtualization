@@ -30,9 +30,6 @@ public class MockApiRequestResponseEntity {
 	@Column(name = "REQUEST_HEADERS")
 	private String requestHeaders;
 
-	@Column(name = "REQUEST_PATH_PARAMETERS")
-	private String requestPathParameters;
-
 	@Column(name = "REQUEST_QUERY_PARAMETERS")
 	private String requestQueryParameters;
 
